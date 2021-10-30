@@ -3,16 +3,16 @@ const express = require('express');
 const path = require('path');
 const logger = require('morgan');
 const mongoose = require('mongoose');
-const session = require('express-session');
-const FileStore = require('session-file-store')(session);
+const passport = require('passport');
 
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 const dishRouter = require('./routes/dishRouter');
 const promoRouter = require('./routes/promoRouter');
 const leaderRouter = require('./routes/leaderRouter');
+const config = require('./config');
 
-const url = 'mongodb://localhost:27017/dishes';
+const url = config.mongoUrl;
 const opts = { useNewUrlParser: true };
 
 mongoose.connect(url, opts)
@@ -21,6 +21,14 @@ mongoose.connect(url, opts)
 
 let app = express();
 
+app.all('*',(req,res,next)=>{
+  if(req.secure){
+    return next();
+  }
+  else{
+    res.redirect(307,'https://'+req.hostname+':'+app.get('secPort')+req.url);
+  }
+});
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'pug');
@@ -29,30 +37,10 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use(session({
-  name: 'session-id',
-  secret: '12345-67890-09867-54321',
-  saveUninitialized: false,
-  resave: false,
-  store: new FileStore()
-}));
+app.use(passport.initialize());
 
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
-
-app.use(function (req, res, next) {
-  console.log(req.session);
-
-  if (!req.session.user) {
-    next(createError(401, 'You are not authenticated!'));
-  } else {
-    if (req.session.user === 'authenticated') {
-      next();
-    } else {
-      next(createError(403, 'You are not authenticated!'));
-    }
-  }
-});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
